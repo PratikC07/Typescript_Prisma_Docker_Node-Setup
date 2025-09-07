@@ -17,6 +17,7 @@ This is the core of your application, organized by feature. Each subfolder here 
     * `*.routes.ts`: Defines the API endpoints for that feature.
     * `*.controller.ts`: Handles incoming requests and sends back responses.
     * `*.service.ts`: Contains the main business logic and interacts with the database.
+    * `*.types.ts` : Contains the typescript request and response types for type safety
 
 ---
 ### ### `src/lib` (Library) 🛠️
