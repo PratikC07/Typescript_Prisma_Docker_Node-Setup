@@ -1,0 +1,438 @@
+Run -- NPM INIT -Y -- inside your perferred folder
+Run -- NPM INSTALL Typescript --  to generate the package.json
+Run -- NPX TSC --INIT -- to generate the Typescript config file
+
+Edit the typescript Config file accordingly as below,
+{
+  // Visit https://aka.ms/tsconfig to read more about this file
+  "compilerOptions": {
+    // File Layout
+    "rootDir": "./src",
+    "outDir": "./dist",
+
+    // Environment Settings
+    // See also https://aka.ms/tsconfig/module
+    "module": "nodenext",
+    "target": "esnext",
+    "types": ["node"],
+    // For nodejs:
+    // "lib": ["esnext"],
+    // "types": ["node"],
+    // and npm install -D @types/node
+
+    // Other Outputs
+    // "sourceMap": true,
+    // "declaration": true,
+    // "declarationMap": true,
+
+    // Stricter Typechecking Options
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+
+    // Style Options
+    // "noImplicitReturns": true,
+    // "noImplicitOverride": true,
+    // "noUnusedLocals": true,
+    // "noUnusedParameters": true,
+    // "noFallthroughCasesInSwitch": true,
+    // "noPropertyAccessFromIndexSignature": true,
+
+    // Recommended Options
+    "strict": true,
+    "jsx": "react-jsx",
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true
+  }
+}
+
+
+
+Create SRC folder inside the your main dir
+
+Run -- NPM INSTALL -d concurrently nodemon prisma @prisma/client @types/node
+
+Create NODEMON.JSON file to write its config as below,
+
+{
+  "watch": ["dist"],
+  "ext": "js",
+  "ignore": ["src", "node_modules"],
+  "exec": "node ./dist/index.js"
+}
+
+Edit the package.json as below steps,
+add type:module
+add scripts as 
+    "start": "node dist/index.js",
+    "dev": "concurrently \"tsc --watch\" \"nodemon\"",
+    "build": "tsc && npm run copy:prisma",
+    "clean": "rm -rf dist",
+    "copy:prisma": "mkdir -p dist/generated && cp -r src/generated/* dist/generated/"
+  
+{
+    while working in the docker container, we build Docker image and run in the container.
+    we usually dont add the node_modules while creating image.
+
+    My Dockerfile for node app,
+
+        # Development stage
+        FROM node:24-alpine as development
+
+        WORKDIR /app
+
+        # Copy package files
+        COPY server/package*.json ./
+        COPY server/prisma ./prisma/
+
+        # Install all dependencies (including dev)
+        RUN npm ci
+
+        # Copy source code
+        COPY server/src ./src/
+        COPY server/tsconfig.json ./
+        COPY server/nodemon.json ./
+
+        # Generate Prisma client
+        RUN npx prisma generate
+
+        # Expose port
+        EXPOSE 3000
+
+        RUN npm run build
+
+        CMD ["npm", "run", "dev"]
+
+
+    Here we copy the package files, then prisma files. Then install all dependencies, then sourceCode.
+    and then create a generated folder for prisma client using prisma generate.
+
+    but WHY WE ADD THE COPY:PRISMA cmd in the scripts??????
+    
+    You know to run the project , we need to convert the TS to JS and it is stored in the dist folder.
+    But when we run BUILD CMD to run TSC , It wont copy the generated folder prisma client from SRC to DIST folder.
+    so when the DIST folder code check for the -- import { PrismaClient } from "../generated/prisma/client.js"; --, it wont get it because,
+    the generated folder is not present in the dist/generated location, it is only present src/generated location.
+
+    we need to copy the GENERATED folder to the dist folder.
+    so after the TSC cmd ,we use the COPY:PRISMA cmd.
+
+
+}
+
+Create a project folder structure as,
+- src - config
+      - lib         - prisma.ts to initiaze the prisma client
+                    - redis.ts to initiaze the redis connection
+      - middlewares - validate.ts for zod req data type safety
+                    - authenticate for authentication os user
+      - modules     - auth - auth.controller.ts
+                           - auth.route.ts
+                           - auth.service.ts
+                           - auth.types.ts
+                    - user
+      - utils       - helper functions such as formatDate.ts
+
+      - api.ts      - use as central api routes for all modules routes
+      - index.ts    
+
+
+{
+
+    API.TS :
+
+        import { Router } from "express";
+        import authRouter from "./modules/auth/auth.route.js";
+        // Import other routers as you create them
+        // import pollRouter from "./polls/poll.route.js";
+
+        const router = Router();
+
+        router.use("/auth", authRouter);
+        // router.use("/polls", pollRouter);
+
+        export default router;
+
+    INDEX.TS :
+
+        import express from "express";
+        import apiRouter from "./api.js";
+
+        const app = express();
+        const PORT = process.env.PORT || 3000;
+
+        app.use(express.json());
+
+        // Main health check
+        app.get("/api/healthcheck", (req, res) => {
+        res.json({ message: "API is running." });
+        });
+
+        // Mount the main API router
+        app.use("/api", apiRouter);
+
+        app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+        });
+
+
+}
+
+Docker SETUP:
+
+outside the main dir, create a Dockerfile for node app , docker-compose file and .dockerignore file.
+like,
+
+- server - dist
+         - node_modules
+         - prisma
+         - src
+         - .gitignore
+         - nodemon.json
+         - package-lock.json
+         - package.json
+         - tsconfig.json
+- .dockerignore
+- .env
+- docker-compose
+- Dockerfile
+
+Then create a Dockerfile to build image of our node application
+
+{
+    Dockerfile: 
+
+        # Development stage
+        FROM node:24-alpine as development
+
+        WORKDIR /app
+
+        # Copy package files
+        COPY server/package*.json ./
+        COPY server/prisma ./prisma/
+
+        # Install all dependencies (including dev)
+        RUN npm ci
+
+        # Copy source code
+        COPY server/src ./src/
+        COPY server/tsconfig.json ./
+        COPY server/nodemon.json ./
+
+        # Generate Prisma client
+        RUN npx prisma generate
+
+        # Expose port
+        EXPOSE 3000
+
+        RUN npm run build
+
+        CMD ["npm", "run", "dev"]
+}
+
+Then create a .dockerignore file which helps ignore the files that are not important or make our image heavy and increase the time to build image while building the image.
+
+{
+    .dockerignore:
+
+        node_modules
+        npm-debug.log
+        .git
+        .gitignore
+        README.md
+        .env
+        .nyc_output
+        coverage
+        .coverage
+        .docker
+        Dockerfile*
+        docker-compose*
+        .dockerignore
+
+}
+
+Then Create a Docker-compose file to manage the resources required for my application.
+
+{
+    docker-compose.yml :
+
+    services:
+        app:
+            build:
+            context: .
+            dockerfile: Dockerfile
+            target: development
+            ports:
+            - "${PORT}:${PORT}"
+            environment:
+            - DATABASE_URL=${DATABASE_URL}
+            - NODE_ENV=${NODE_ENV}
+            - REDIS_URL=${REDIS_URL}
+            - PORT=${PORT}
+            - JWT_SECRET=${JWT_SECRET}
+            volumes:
+            # This syncs your local 'server' directory with '/app' in the container
+            - ./server:/app
+            # This prevents your local node_modules from overwriting the container's
+            - /app/node_modules
+            depends_on:
+            db:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+            networks:
+            - poll-network
+        db:
+            image: postgres:16
+            ports:
+            - "5432:5432"
+            volumes:
+            - postgres_data:/var/lib/postgresql/data
+            environment:
+            - POSTGRES_DB=poll_db
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=postgres
+            networks:
+            - poll-network
+            restart: always
+            healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+        redis:
+            image: redis:8.2.1-alpine
+            ports:
+            - "6379:6379"
+            networks:
+            - poll-network
+            restart: always
+            volumes:
+            - redis_data:/data
+            healthcheck:
+            test: ["CMD-SHELL", "redis-cli ping"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    volumes:
+        postgres_data:
+        redis_data:
+
+    networks:
+        poll-network:
+
+}
+
+and You Are GOOD TO GO....
+
+to SPIN UP the all the services , run below cmd,
+
+-- docker compose up -d
+
+to Destroy the containers
+
+-- docker compose down --volumes
+
+to Stop the services
+
+-- docker compose stop
+
+to Start the services
+
+-- docker compose start -d
+
+to run the cmds inside the docker container 
+
+-- docker compose exec nameOfservice cmd
+eg. 
+-- docker compose exec app npx prisma migrate dev
+
+POINT TO REMEMBER:
+
+- IF YOUR SCHEMA.PRISMA FILE CHANGES, YOU NEED TO EXECUTE THE BELOW CMD MANUALLY.
+
+    -- docker-compose exec app npx prisma migrate dev --name add_user_table
+
+- if you using the typescript, then when you install any package , you have to install its types as dev-dependencies.
+    eg. npm i express
+        npm i -D @types/express
+
+
+Doubts:
+
+{
+
+    IF YOUR SCHEMA.PRISMA FILE CHANGES, YOU NEED TO EXECUTE THE BELOW CMD MANUALLY.
+
+    -- docker-compose exec app npx prisma migrate dev --name add_user_table
+
+    with this cmd , your prisma folder and generated folder inside the SRC folder will be updated,
+    as it run the PRISMA GENERATE cmd internally to update the prisma client.
+
+    (
+    if the prisma client is not updated properly , you can run belwo cmd,
+
+    -- docker-compose exec app npx prisma generate
+    )
+
+
+    after the GENERATED folder is updated inside the SRC , then those changes are reflected in the DIST/GENERATED folder automatically. 
+
+    Question :
+    - If you are wondering when we run the -- docker-compose exec app npx prisma migrate dev --,  the prisma and the SRC/GENERATED folder is updated,
+      But then how the updated changes are reflected from the SRC/GENERATED to DIST/GENERATED ????
+
+    ANSWER:
+
+        You are absolutely correct in your analysis of the `build` script. For a one-time production build, you **must** have a script like `copy:prisma` because the `tsc` command on its own will not copy the `generated` folder.
+
+        The situation is different during **development** because your `dev` script uses `tsc --watch`, which behaves differently than a single `tsc` command.
+
+        Let's analyze the situation as you requested.
+
+        -----
+
+        ## \#\# Production vs. Development: A Tale of Two Compilers
+
+        The confusion comes from thinking that `tsc` and `tsc --watch` do the same job. They don't.
+
+        ### \#\#\# 1. The Production Build (`npm run build`)
+
+        Your logic here is perfect.
+
+        * `tsc` runs once. It finds all `.ts` files, compiles them to `.js` in `dist`, and then stops. It ignores non-TypeScript assets.
+        * `npm run copy:prisma` then runs once to manually copy the necessary assets that `tsc` ignored.
+        * This creates a complete, static `dist` folder ready for deployment.
+
+        ### \#\#\# 2. The Development Workflow (`npm run dev`)
+
+        This workflow is dynamic and relies on a chain reaction between the tools running concurrently. The key is that **`tsc --watch` is constantly monitoring your entire `src` directory**.
+
+        Here is the exact sequence of events when you run `migrate` during development:
+
+        1.  **You run the migrate command:**
+
+            ```bash
+            docker-compose exec app npx prisma migrate dev
+            ```
+
+        2.  **Prisma updates `src`**: As part of this process, `prisma generate` is triggered, and it updates the client files inside `src/generated/prisma`. These generated files are essentially TypeScript code (JavaScript with extensive `.d.ts` type definition files).
+
+        3.  **`tsc --watch` Sees the Change**: The `tsc --watch` process, which has been running in the background, is monitoring the `src` folder. It immediately detects that files have changed inside `src/generated/prisma`.
+
+        4.  **`tsc --watch` Recompiles to `dist`**: Because `tsc` understands these generated files as valid source code, it **recompiles them into JavaScript inside your `dist/generated` folder**. This is the crucial step. In development, the "copying" happens automatically through this continuous compilation process.
+
+        5.  **`nodemon` Restarts the Server**: `nodemon`, which is watching the `dist` folder, sees the newly compiled JavaScript files and restarts your Node.js application.
+
+        -----
+
+        ## \#\# Conclusion
+
+        You've uncovered the subtle but critical difference between the two workflows:
+
+        * For a **production build**, you are correct. You need a manual `copy:prisma` script because `tsc` runs only once.
+        * For **development**, you do not need to do anything manually. The `tsc --watch` process automatically detects changes in `src/generated` and recompiles them into the `dist` folder, which then triggers `nodemon`.
+}
