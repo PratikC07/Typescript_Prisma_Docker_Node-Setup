@@ -9,6 +9,9 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - NODE_ENV=${NODE_ENV}
+      - REDIS_URL=${REDIS_URL}
+      - PORT=${PORT}
+      - JWT_SECRET=${JWT_SECRET}
     volumes:
       # This syncs your local 'server' directory with '/app' in the container
       - ./server:/app
@@ -16,6 +19,8 @@ services:
       - /app/node_modules
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - poll-network
@@ -38,8 +43,24 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:8.2.1-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - poll-network
+    restart: always
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   poll-network:
