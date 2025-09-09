@@ -17,6 +17,9 @@ services:
       - ./server:/app
       # This prevents your local node_modules from overwriting the container's
       - /app/node_modules
+      - /app/dist
+      - /app/src/generated
+
     depends_on:
       db:
         condition: service_healthy

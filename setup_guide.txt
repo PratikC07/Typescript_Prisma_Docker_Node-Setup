@@ -274,8 +274,10 @@ Then Create a Docker-compose file to manage the resources required for my applic
             volumes:
             # This syncs your local 'server' directory with '/app' in the container
             - ./server:/app
-            # This prevents your local node_modules from overwriting the container's
+            # This prevents your local folders from overwriting the container's
             - /app/node_modules
+            - /app/dist
+            - /app/src/generated
             depends_on:
             db:
                 condition: service_healthy
@@ -349,6 +351,11 @@ to run the cmds inside the docker container
 -- docker compose exec nameOfservice cmd
 eg. 
 -- docker compose exec app npx prisma migrate dev
+
+to rebuild and restart in one shot
+
+-- docker compose up --build
+
 
 POINT TO REMEMBER:
 
