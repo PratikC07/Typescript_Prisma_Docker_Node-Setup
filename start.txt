@@ -1,0 +1,3 @@
+
+for first time, to reflect changes and create tables in actual DB 
+docker-compose exec app npx prisma migrate dev

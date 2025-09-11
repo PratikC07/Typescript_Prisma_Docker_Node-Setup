@@ -30,7 +30,9 @@ export const updateMyProfile = async (
 ) => {
   try {
     const userId = req.user!.userId;
-    const updatedUser = await updateUserProfile(userId, req.body);
+    const file = req.file;
+    const body = req.body;
+    const updatedUser = await updateUserProfile(userId, body, file);
     res.status(200).json({
       status: "success",
       data: {

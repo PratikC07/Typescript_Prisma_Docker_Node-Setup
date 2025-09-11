@@ -4,15 +4,26 @@ import { ZodError, type ZodObject } from "zod";
 export const validate = (schema: ZodObject) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await schema.parseAsync({
+      console.log("🔍 VALIDATION MIDDLEWARE:");
+      console.log("  - req.method:", req.method);
+      console.log("  - req.url:", req.url);
+      console.log("  - req.params:", req.params);
+      console.log("  - req.body:", req.body);
+      console.log("  - req.query:", req.query);
+
+      const dataToValidate = {
         body: req.body,
         query: req.query,
         params: req.params,
-      });
+      };
+
+      await schema.parseAsync(dataToValidate);
 
       return next();
     } catch (error) {
+      console.log("  ❌ Validation failed:");
       if (error instanceof ZodError) {
+        console.log("  - Zod validation errors:", error.issues);
         return res.status(400).json({
           status: "fail",
           errors: error.issues.map((err) => ({
@@ -21,6 +32,7 @@ export const validate = (schema: ZodObject) => {
           })),
         });
       }
+      console.log("  - Non-Zod error:", error);
       return next(error);
     }
   };

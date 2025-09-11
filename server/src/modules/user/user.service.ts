@@ -25,13 +25,23 @@ export const getUserProfile = async (userId: string) => {
 
 export const updateUserProfile = async (
   userId: string,
-  data: UpdateUserSchema
+  data: UpdateUserSchema,
+  file: Express.Multer.File | undefined
 ) => {
+  const updateData: any = {};
+
+  if (data.name !== undefined) {
+    updateData.name = data.name;
+  }
+  if (file !== undefined) {
+    updateData.photoUrl = file.path;
+  }
+
   const updatedUser = await prisma.user.update({
     where: {
       id: userId,
     },
-    data: { ...data },
+    data: updateData,
     select: {
       id: true,
       name: true,

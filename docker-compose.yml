@@ -12,6 +12,10 @@ services:
       - REDIS_URL=${REDIS_URL}
       - PORT=${PORT}
       - JWT_SECRET=${JWT_SECRET}
+      - BASE_URL=${BASE_URL}
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
     volumes:
       # This syncs your local 'server' directory with '/app' in the container
       - ./server:/app

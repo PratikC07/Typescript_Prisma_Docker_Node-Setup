@@ -5,7 +5,6 @@ export const updateUserSchema = z.object({
     .string()
     .min(3, { message: "Name must be at least 3 characters" })
     .optional(),
-  photoUrl: z.string().optional(),
 });
 
 export const updateUserBodySchema = z.object({
