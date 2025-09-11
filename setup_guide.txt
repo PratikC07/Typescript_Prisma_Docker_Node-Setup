@@ -73,7 +73,7 @@ add scripts as
   
 {
     while working in the docker container, we build Docker image and run in the container.
-    we usually dont add the node_modules while creating image.
+    we usually dont add the node_modules, dist and src/generated folders while creating image for faster build .
 
     My Dockerfile for node app,
 
@@ -105,8 +105,18 @@ add scripts as
         CMD ["npm", "run", "dev"]
 
 
-    Here we copy the package files, then prisma files. Then install all dependencies, then sourceCode.
-    and then create a generated folder for prisma client using prisma generate.
+    Here we copy the package files, then prisma files. Then install all dependencies, then copy all sourceCode.
+    and then create a generated folder for prisma client using npx prisma generate. then using the npm run build ,
+    we create DIST folder and copy the SRC/GENERATED folder to DIST/GENERATED using COPY:PRISMA script.
+    also the NODE_MODULES, DIST and SRC/GENERATED folder have separate Volumes in the container , it is not binded to local code.
+
+    volumes:
+      # This syncs your local 'server' directory with '/app' in the container
+      - ./server:/app
+      # This prevents your local node_modules from overwriting the container's
+      - /app/node_modules
+      - /app/dist
+      - /app/src/generated
 
     but WHY WE ADD THE COPY:PRISMA cmd in the scripts??????
     
@@ -255,76 +265,79 @@ Then create a .dockerignore file which helps ignore the files that are not impor
 Then Create a Docker-compose file to manage the resources required for my application.
 
 {
-    docker-compose.yml :
-
     services:
         app:
             build:
-            context: .
-            dockerfile: Dockerfile
-            target: development
+                context: .
+                dockerfile: Dockerfile
+                target: development
             ports:
-            - "${PORT}:${PORT}"
+                - "${PORT}:${PORT}"
             environment:
-            - DATABASE_URL=${DATABASE_URL}
-            - NODE_ENV=${NODE_ENV}
-            - REDIS_URL=${REDIS_URL}
-            - PORT=${PORT}
-            - JWT_SECRET=${JWT_SECRET}
+                - DATABASE_URL=${DATABASE_URL}
+                - NODE_ENV=${NODE_ENV}
+                - REDIS_URL=${REDIS_URL}
+                - PORT=${PORT}
+                - JWT_SECRET=${JWT_SECRET}
+                - BASE_URL=${BASE_URL}
+                - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
+                - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
+                - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
             volumes:
-            # This syncs your local 'server' directory with '/app' in the container
-            - ./server:/app
-            # This prevents your local folders from overwriting the container's
-            - /app/node_modules
-            - /app/dist
-            - /app/src/generated
+                # This syncs your local 'server' directory with '/app' in the container
+                - ./server:/app
+                # This prevents your local node_modules from overwriting the container's
+                - /app/node_modules
+                - /app/dist
+                - /app/src/generated
+
             depends_on:
-            db:
-                condition: service_healthy
-            redis:
-                condition: service_healthy
+                db:
+                    condition: service_healthy
+                redis:
+                    condition: service_healthy
             networks:
-            - poll-network
+                - poll-network
         db:
             image: postgres:16
             ports:
-            - "5432:5432"
+                - "5432:5432"
             volumes:
-            - postgres_data:/var/lib/postgresql/data
+                - postgres_data:/var/lib/postgresql/data
             environment:
-            - POSTGRES_DB=poll_db
-            - POSTGRES_USER=postgres
-            - POSTGRES_PASSWORD=postgres
+                - POSTGRES_DB=poll_db
+                - POSTGRES_USER=postgres
+                - POSTGRES_PASSWORD=postgres
             networks:
-            - poll-network
+                - poll-network
             restart: always
             healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U postgres"]
-            interval: 10s
-            timeout: 5s
-            retries: 5
+                test: ["CMD-SHELL", "pg_isready -U postgres"]
+                interval: 10s
+                timeout: 5s
+                retries: 5
 
         redis:
             image: redis:8.2.1-alpine
             ports:
-            - "6379:6379"
+                - "6379:6379"
             networks:
-            - poll-network
+                - poll-network
             restart: always
             volumes:
-            - redis_data:/data
+                - redis_data:/data
             healthcheck:
-            test: ["CMD-SHELL", "redis-cli ping"]
-            interval: 10s
-            timeout: 5s
-            retries: 5
+                test: ["CMD-SHELL", "redis-cli ping"]
+                interval: 10s
+                timeout: 5s
+                retries: 5
 
-    volumes:
-        postgres_data:
-        redis_data:
+        volumes:
+            postgres_data:
+            redis_data:
 
-    networks:
-        poll-network:
+        networks:
+            poll-network:
 
 }
 
