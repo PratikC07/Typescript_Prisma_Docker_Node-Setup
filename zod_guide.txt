@@ -1,0 +1,89 @@
+-- First you need to install ZOD using the ,
+
+  NPM I ZOD
+
+( It is used to validate the data from the request. )
+
+-- Then we define a middleware that will validate the req data before going to Handler,
+
+VALIDATE FUNCTION
+
+-- which validate schema as,
+
+        const dataToValidate = {
+            body: req.body,
+            query: req.query,
+            params: req.params,
+        };
+
+        await schema.parseAsync(dataToValidate);
+
+
+-- then for every module , you need to create file called module.types.ts.
+    that will have all the schema and types.
+
+-- so , in the module.route.ts , we validate the req data according to above schema structure so, our structure should be,
+{
+    body: bodyDataSchema,
+    params: paramDataSchema,
+    query: queryDataSchema
+}
+
+
+-- so for that ,
+   we define the types file as,
+
+import { z } from "zod";
+
+// Schema for requests that use a pollId in the URL params
+export const pollParamsInput = z.object({
+  pollId: z.string().uuid("Invalid poll ID format"),
+});
+
+export const pollParamsSchema = z.object({
+  params: pollParamsInput,
+});
+
+export const submitVoteInput = z.object({
+  optionId: z.string().uuid("Invalid option ID format"),
+  voterName: z.string().min(3, "Voter name must be at least 3 characters long"),
+});
+
+export const submitSchema = z.object({
+  body: submitVoteInput,
+  params: pollParamsInput,
+});
+
+
+export type SubmitVoteInput = z.infer<typeof submitVoteInput>;
+export type PollParamsInput = z.infer<typeof pollParamsInput>;
+
+
+-- Here Input name variable is used for typescript types in the controller and service file.
+from this, 
+
+export type SubmitVoteInput = z.infer<typeof submitVoteInput>;
+export type PollParamsInput = z.infer<typeof pollParamsInput>;
+
+-- and the Zod Schema variables are used for the module.route.ts to add in the VALIDATE middleware,
+as below,
+
+router.get(
+  "/polls/:pollId",
+  validate(pollParamsSchema),
+  getPollForVotingHandler
+);
+
+router.post("/polls/:pollId/vote", validate(submitSchema), submitVoteHandler);
+
+router.get(
+  "/polls/:pollId/results",
+  validate(pollParamsSchema),
+  getPollResultsHandler
+);
+
+router.get(
+  "/polls/:pollId/results/stream",
+  validate(pollParamsSchema),
+  streamPollResultsHandler
+);
